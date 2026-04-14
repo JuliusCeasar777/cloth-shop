@@ -290,8 +290,15 @@
 
   <script type="text/babel">
     const { useState, useEffect } = React;
+    // ---------------------------------------------------------
+    // DEPLOYMENT CONFIGURATION
+    // When you deploy your backend to Render, paste the Render URL here:
+    // Example: const PROD_BACKEND_URL = 'https://aura-clothing-backend.onrender.com';
+    const PROD_BACKEND_URL = ''; 
+    // ---------------------------------------------------------
+
     const isLocalMode = window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const API_URL = (isLocalMode && window.location.port !== '5000') ? 'http://localhost:5000' : '';
+    const API_URL = (isLocalMode && window.location.port !== '5000') ? 'http://localhost:5000' : PROD_BACKEND_URL;
 
     const TopBar = () => (
       <div style={{background: 'var(--secondary)', color: '#fff', fontSize: '0.8rem', padding: '8px 40px', display: 'flex', justifyContent: 'space-between', flexWrap:'wrap', gap:10}}>
@@ -759,7 +766,7 @@
                     <div style={{marginBottom: 30}}>
                       <div style={{display:'flex', justifyContent:'space-between', marginBottom:10}}>
                          <h4 style={{textTransform:'uppercase', fontSize:'0.9rem'}}>Select Size</h4>
-                         <a href="#" style={{color:'var(--primary)', fontSize:'0.85rem', fontWeight:600}}>Size Guide</a>
+                         <a href="#" onClick={(e) => { e.preventDefault(); showToast("Size Guide: S (36), M (38), L (40), XL (42)"); }} style={{color:'var(--primary)', fontSize:'0.85rem', fontWeight:600}}>Size Guide</a>
                       </div>
                       <div style={{display:'flex', gap:10}}>
                         {['S','M','L','XL'].map(s => (

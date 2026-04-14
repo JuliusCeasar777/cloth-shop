@@ -13,6 +13,9 @@ const path = require('path');
 const nodemailer = require('nodemailer');
 const twilio = require('twilio');
 const { OAuth2Client } = require('google-auth-library');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || 'dummy-client-id');
@@ -68,12 +71,32 @@ async function sendOrderNotifications(order, user) {
 
 const app = express();
 
+// ── SECURITY & LOGGING ─────────────────────────────────
+app.use(helmet({ 
+  contentSecurityPolicy: false, 
+  crossOriginEmbedderPolicy: false 
+}));
+app.use(morgan('combined'));
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+
 // ── MIDDLEWARE ─────────────────────────────────────────
+app.use('/api', apiLimiter);
 app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static('uploads'));
-app.use(express.static(__dirname));
+app.use(express.static("frontend"));
+
+app.get("/", (req, res) => {
+  res.send("API is running successfully");
+});
 
 // ── FILE UPLOAD (Multer) ──────────────────────────────
 const storage = multer.diskStorage({
@@ -445,13 +468,17 @@ app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
 
 // ── ERROR HANDLER ──────────────────────────────────────
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Internal server error' });
+  console.error(`[ERROR] ${new Date().toISOString()} - ${req.method} ${req.url}:`, err.message);
+  if (process.env.NODE_ENV !== 'production') console.error(err.stack);
+  res.status(500).json({ 
+    error: 'Internal server error', 
+    message: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred.' : err.message 
+  });
 });
 
 // ── DATABASE + SERVER ─────────────────────────────────
 const PORT = process.env.PORT || 5000;
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/threadhaus')
+mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB connected');
     User.findOne({ email: 'admincenter' }).then(async admin => {
@@ -463,7 +490,9 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/threadhau
       }
       console.log('✅ Admin credentials ready: admincenter / admin123');
     });
-    app.listen(PORT, () => console.log(`🚀 ThreadHaus API running on port ${PORT}`));
+    app.listen(PORT, () => {
+console.log(`API running on port ${PORT}`);
+});
   })
   .catch(err => {
     console.error('❌ MongoDB connection failed:', err.message);
